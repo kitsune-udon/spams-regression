@@ -1,6 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import random,math,spams
+import random,math
+
+library_mode = 'sklearn'
+
+if library_mode == 'sklearn':
+    from sklearn import linear_model
+elif library_mode == 'spams':
+    import spams
+else:
+    raise "Specify library"
 
 def generate_values(xs, func_true, sigma):
     ys = []
@@ -22,23 +31,46 @@ def plot_curve(func, label, x_min, x_max, delta):
     ys = map(lambda x: func(x), xs)
     plt.plot(xs, ys, '-', label=label)
 
-def estimate_by_lasso(xs, ys, dim, penalty_order=-5):
-    penalty = len(ys) * math.pow(10, penalty_order)
-    Y = np.array([ys], dtype=np.float64).transpose()
-    a = []
+if library_mode == 'sklearn':
+    def estimate_by_lasso(xs, ys, dim, penalty_order=-5):
+        Y = np.array(ys, dtype=np.float64)
+        a = []
 
-    for x in xs:
-        row = map(lambda d: math.pow(x,d), range(dim, -1, -1))
-        a.append(row)
+        for x in xs:
+            row = map(lambda d: math.pow(x,d), range(dim, -1, -1))
+            a.append(row)
 
-    A = np.asfortranarray(a, dtype=np.float64)
-    W = spams.lasso(Y, D=A, return_reg_path=False, lambda1=penalty)
-    r = []
+        A = np.asfortranarray(a, dtype=np.float64)
+        estimator = linear_model.Lasso(
+                alpha=math.pow(10, penalty_order)
+                ,max_iter=math.pow(10,4)
+                #,tol=math.pow(10,-4)
+                )
+        estimator.fit(A,Y)
+        #print estimator.get_params()
+        #print estimator.n_iter_
+        #print estimator.coef_
+        return estimator.coef_
+elif library_mode == 'spams':
+    def estimate_by_lasso(xs, ys, dim, penalty_order=-5):
+        penalty = len(ys) * math.pow(10, penalty_order)
+        Y = np.array([ys], dtype=np.float64).transpose()
+        a = []
 
-    for i in range(W.shape[0]):
-        r.append(W[i,0].item())
+        for x in xs:
+            row = map(lambda d: math.pow(x,d), range(dim, -1, -1))
+            a.append(row)
 
-    return r
+        A = np.asfortranarray(a, dtype=np.float64)
+        W = spams.lasso(Y, D=A, return_reg_path=False, lambda1=penalty)
+        r = []
+
+        for i in range(W.shape[0]):
+            r.append(W[i,0].item())
+
+        return r
+else:
+    pass
 
 def calc_and_plot(title, func_true, x_min, x_max, x_delta, noise_sigma,
         lsm_dims=[2,10], lasso_dim=20, ylim=None, legend_loc='upper left',
@@ -75,6 +107,6 @@ func_true2 = lambda x: math.sin(x)
 
 np.random.seed(0)
 calc_and_plot(r"$-x^{10}+x$", func_true, 0., 1., 0.05, 0.05, subplot_param=(2,1,1), lasso_dim=20)
-calc_and_plot(r"$\sin x$", func_true2, 0., math.pi*2, 0.2, 0.001, subplot_param=(2,1,2), ylim=(-1.3, 1.3), legend_loc='lower left', lsm_dims=[4,6])
+calc_and_plot(r"$\sin x$", func_true2, 0., math.pi*2, 0.2, 0.05, subplot_param=(2,1,2), ylim=(-1.3, 1.3), legend_loc='lower left', lsm_dims=[4,6], lasso_dim=20)
 
 plt.savefig('image.png')
