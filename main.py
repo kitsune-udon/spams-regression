@@ -2,13 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random,math
 
-algorithm = 'my_fista'
+algorithm = 'my_cd'
 
 if algorithm in ['sklearn_cd']:
     from sklearn import linear_model
 elif algorithm in ['spams_lars', 'spams_fista']:
     import spams
-elif algorithm in ['my_fista']:
+elif algorithm in ['my_fista', 'my_cd']:
     pass
 else:
     raise "Specify Algorithm"
@@ -36,7 +36,7 @@ def plot_curve(func, label, x_min, x_max, delta):
 def lasso_sklearn_cd(Y, A, lambda1):
     estimator = linear_model.Lasso(
             alpha=lambda1
-            ,max_iter=1000
+            ,max_iter=10000
             )
     estimator.fit(A,Y)
     return estimator.coef_
@@ -113,7 +113,7 @@ def lasso_my_fista(Y, A, lambda1):
             z_cur = z_succ
             i += 1
 
-        print "end at {} th iter".format(i)
+        #print "end at {} th iter".format(i)
         return w_cur
 
     n = Y.shape[0]
@@ -124,6 +124,45 @@ def lasso_my_fista(Y, A, lambda1):
     for i in range(W.shape[0]):
         r.append(W[i,0].item())
     return r
+
+def lasso_my_cd(Y,A,lambda1):
+    def lasso_cd(y,X,b0,lambda1,max_iter=1000, eps=1e-5):
+        def st_op(lambda1,x):
+            x_abs = abs(x)
+            sign = x / x_abs
+            return sign * max((x_abs - lambda1), 0.)
+
+        e = np.full(X.shape[1], eps)
+        b_cur = b0
+        i = 0
+        while True:
+            if max_iter and i >= max_iter:
+                break
+
+            b_succ = np.array(b_cur)
+
+            for j in xrange(X.shape[1]):
+                r_j = y - np.dot(X, b_succ) + X[:,j].reshape((X.shape[0],1)) * b_succ[j,0]
+                x_j = X[:,j]
+                st_arg = np.dot(x_j.transpose(), r_j) / np.dot(x_j.transpose(), x_j)
+                b_j = st_op(lambda1, st_arg) # (1,1) matrix
+                b_succ[j,0] = b_j
+
+            if np.all(np.absolute(b_succ - b_cur) < e):
+                b_cur = b_succ
+                break
+
+            b_cur = b_succ
+            i += 1
+
+        #print "end at {} th iter".format(i)
+        return b_cur
+
+    n = A.shape[0]
+    Y = Y.reshape((A.shape[0], 1))
+    W0 = np.zeros((A.shape[1], 1), dtype=np.float64)
+    W = lasso_cd(Y, A, W0, n*lambda1, max_iter=10000, eps=1e-3)
+    return W.ravel().tolist()
 
 def estimate_by_lasso(xs, ys, dim, lambda1):
     def make_input(xs,ys,dim):
@@ -145,6 +184,8 @@ def estimate_by_lasso(xs, ys, dim, lambda1):
         return lasso_spams_fista(Y, A, lambda1)
     elif algorithm == 'my_fista':
         return lasso_my_fista(Y, A, lambda1)
+    elif algorithm == 'my_cd':
+        return lasso_my_cd(Y, A, lambda1)
     else:
         raise "Specify Algorithm"
 
@@ -175,19 +216,19 @@ def calc_and_plot(plot_param):
     plt.legend(loc=plot_param["legend_loc"])
 
 
-plt.figure(num=None, figsize=(8,12), dpi=80)
+plt.figure(num=None, figsize=(15,5), dpi=80)
 
 func_true  = lambda x: -math.pow(x,10)+x
 func_true2 = lambda x: math.sin(x)
 
 np.random.seed(1)
-lasso_lambda = 1e-3
+lasso_lambda = 1e-8
 plot_param = {
         "title" : r"$-x^{10}+x$",
         "xlim" : (0., 1.),
         "x_gen" : lambda x_min, x_max: np.arange(x_min, x_max, 0.05),
         "noise_sigma" : 0.05,
-        "subplot_param" : (2,1,1),
+        "subplot_param" : (1,2,1),
         "ylim" : (0., 1.),
         "func_true" : func_true,
         "lasso_dim" : 2,
@@ -198,19 +239,20 @@ plot_param = {
         }
 plot_param2 = {
         "title" : r"$\sin x$",
-        "xlim" : (0.,  math.pi),
-        "x_gen" : lambda x_min, x_max: np.arange(x_min, x_max, 0.1),
-        "noise_sigma" : 0.0001,
-        "subplot_param" : (2,1,2),
+        "xlim" : (- math.pi,  math.pi),
+        "x_gen" : lambda x_min, x_max: np.arange(x_min, x_max, 0.5),
+        "noise_sigma" : 0.05,
+        "subplot_param" : (1,2,2),
         "ylim" : (-1.3, 1.3),
         "func_true" : func_true2,
         "lasso_dim" : 2,
-        "lasso_lambda" : 1e-50,
-        "legend_loc" : "lower left",
+        "lasso_lambda" : lasso_lambda,
+        "legend_loc" : "upper left",
         "lsm_dims" : [4,6],
         "lasso_dim" : 20,
         }
 calc_and_plot(plot_param)
 calc_and_plot(plot_param2)
 
-plt.savefig('image.png')
+#plt.savefig('image.png')
+plt.savefig('image_'+algorithm+'.png')
