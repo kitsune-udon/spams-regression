@@ -2,17 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random,math
 
-algorithm = 'my_admm'
-
-if algorithm in ['sklearn_cd']:
-    from sklearn import linear_model
-elif algorithm in ['spams_lars', 'spams_fista']:
-    import spams
-elif algorithm in ['my_fista', 'my_cd', 'my_admm']:
-    pass
-else:
-    raise "Specify Algorithm"
-
 def generate_values(xs, func_true, sigma):
     ys = []
 
@@ -271,11 +260,16 @@ def calc_and_plot(plot_param):
     plt.legend(loc=plot_param["legend_loc"])
 
 
+algorithm = 'my_admm'
+if algorithm in ['sklearn_cd']:
+    from sklearn import linear_model
+elif algorithm in ['spams_lars', 'spams_fista']:
+    import spams
+elif algorithm in ['my_fista', 'my_cd', 'my_admm']:
+    pass
+else:
+    raise "Specify Algorithm"
 plt.figure(num=None, figsize=(15,5), dpi=80)
-
-func_true  = lambda x: -math.pow(x,10)+x
-func_true2 = lambda x: math.sin(x)
-
 np.random.seed(1)
 lasso_lambda = 1e-8
 plot_param = {
@@ -285,7 +279,7 @@ plot_param = {
         "noise_sigma" : 0.05,
         "subplot_param" : (1,2,1),
         "ylim" : (0., 1.),
-        "func_true" : func_true,
+        "func_true" : lambda x: -math.pow(x,10)+x,
         "lasso_dim" : 2,
         "lasso_lambda" : lasso_lambda,
         "legend_loc" : "upper left",
@@ -299,7 +293,7 @@ plot_param2 = {
         "noise_sigma" : 0.05,
         "subplot_param" : (1,2,2),
         "ylim" : (-1.3, 1.3),
-        "func_true" : func_true2,
+        "func_true" : lambda x: math.sin(x),
         "lasso_dim" : 2,
         "lasso_lambda" : lasso_lambda,
         "legend_loc" : "upper left",
@@ -308,6 +302,5 @@ plot_param2 = {
         }
 calc_and_plot(plot_param)
 calc_and_plot(plot_param2)
-
 #plt.savefig('image.png')
 plt.savefig('image_'+algorithm+'.png')
