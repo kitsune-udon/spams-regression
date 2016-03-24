@@ -2,13 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random,math
 
-algorithm = 'my_cd'
+algorithm = 'my_admm'
 
 if algorithm in ['sklearn_cd']:
     from sklearn import linear_model
 elif algorithm in ['spams_lars', 'spams_fista']:
     import spams
-elif algorithm in ['my_fista', 'my_cd']:
+elif algorithm in ['my_fista', 'my_cd', 'my_admm']:
     pass
 else:
     raise "Specify Algorithm"
@@ -161,7 +161,60 @@ def lasso_my_cd(Y,A,lambda1):
     n = A.shape[0]
     Y = Y.reshape((A.shape[0], 1))
     W0 = np.zeros((A.shape[1], 1), dtype=np.float64)
-    W = lasso_cd(Y, A, W0, n*lambda1, max_iter=10000, eps=1e-3)
+    W = lasso_cd(Y, A, W0, n*lambda1, max_iter=10000)
+    return W.ravel().tolist()
+
+def lasso_my_admm(Y,A,lambda1):
+    def l1_prox(lambda1, v):
+        r = np.zeros(v.shape, dtype=np.float64)
+
+        for i in xrange(v.shape[0]):
+            vi = v[i]
+            vi_abs = abs(vi)
+            if vi_abs > lambda1:
+                sign = vi / vi_abs
+                r[i] = (vi_abs-lambda1) * sign
+
+        return r
+
+    def lasso_admm(y,A,w0,lambda1,max_iter=100, eps=1e-5, rho=1.0):
+        e = np.full(y.shape[0], eps)
+        b_cur = w0
+        t_cur = w0
+        m_cur = np.zeros(w0.shape)
+        i = 0
+
+        C0 = np.linalg.inv(np.dot(A.transpose(),A) +
+                rho*np.identity(A.shape[1], dtype=np.float64))
+        C1 = np.dot(A.transpose(), y)
+
+        while True:
+            if max_iter and i >= max_iter:
+                break
+
+            C2 = C1 + rho * t_cur - m_cur
+            b_succ = np.dot(C0, C2)
+            t_succ = l1_prox(lambda1/rho, b_succ+m_cur/rho)
+            m_succ = m_cur + rho * (b_succ - t_succ)
+
+            if np.all(np.absolute(b_succ - t_succ) < e):
+                b_cur = b_succ
+                t_cur = t_succ
+                m_cur = m_succ
+                break
+
+            b_cur = b_succ
+            t_cur = t_succ
+            m_cur = m_succ
+            i += 1
+
+        #print "end at {} th iter".format(i)
+        return b_cur
+
+    n = A.shape[0]
+    Y = Y.reshape((A.shape[0], 1))
+    W0 = np.zeros((A.shape[1], 1), dtype=np.float64)
+    W = lasso_admm(Y, A, W0, n*lambda1, max_iter=10000, rho=0.1)
     return W.ravel().tolist()
 
 def estimate_by_lasso(xs, ys, dim, lambda1):
@@ -186,6 +239,8 @@ def estimate_by_lasso(xs, ys, dim, lambda1):
         return lasso_my_fista(Y, A, lambda1)
     elif algorithm == 'my_cd':
         return lasso_my_cd(Y, A, lambda1)
+    elif algorithm == 'my_admm':
+        return lasso_my_admm(Y, A, lambda1)
     else:
         raise "Specify Algorithm"
 
